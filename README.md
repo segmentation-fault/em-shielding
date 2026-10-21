@@ -56,17 +56,23 @@ fem/
   femm2d.py       independent FEMM 4.2 harmonic 2-D model (geometry only, no physics)
   compare.py      T0-T4 cross-validation harness -> fem/results.npz
   tune.py         parameter study + reference noise floor -> fem/tune.npz
-figures/          one driver per FEM cross-check figure -> PNG next to the script
-tests/            inductance unit tests, sanity checks, FEM source-model gate
+figures/          one driver per reproduced figure -> PNG next to the script
+tests/            inductance unit tests, sanity + claim verification
 ```
 
-## Figures
+## Reproduced figures
 
-| Script | Shows |
+| Script | Reproduces |
 |---|---|
+| `figures/fig_sergeant_05.py` | Sergeant Fig. 5 — B(x) at z=1 m, parallel/transversal x Rc |
+| `figures/fig_sergeant_03.py` | Sergeant Fig. 3 — grid-refinement convergence at P2(0,0,1) |
+| `figures/fig_sergeant_06_07.py` | Sergeant Fig. 6 & 7 — shield size, width, depth, spacing |
+| `figures/fig_dewulf_03.py` | De Wulf Fig. 3 — six-plate open shield vs Rcont |
 | `figures/fig_fem_compare.py` | FEM cross-check — finite shield vs 2-D FEM |
 | `figures/fig_fem_bridge.py` | FEM cross-check — where the residual gap comes from |
 | `figures/fig_fem_tune.py` | parameter tuning — the reference's noise floor, and the cross-section optimum |
+| `figures/fig_tuned_claims.py` | the reproduced claims across the mesh family — which survive |
+| `figures/fig_tuned_profiles.py` | Sergeant Fig. 5 and De Wulf Fig. 3 with their mesh-uncertainty bands |
 
 ## Run
 
@@ -74,7 +80,8 @@ tests/            inductance unit tests, sanity checks, FEM source-model gate
 python -m venv .venv
 .venv/Scripts/python -m pip install -r requirements.txt   # Windows
 .venv/Scripts/python tests/test_inductance.py             # unit tests
-.venv/Scripts/python tests/sanity.py                      # sanity checks
+.venv/Scripts/python tests/verify_claims.py               # headline claims
+.venv/Scripts/python figures/fig_sergeant_05.py           # -> figures/*.png
 ```
 
 The FEM cross-validation additionally needs FEMM 4.2 installed
@@ -89,9 +96,20 @@ The FEM cross-validation additionally needs FEMM 4.2 installed
 .venv/Scripts/python fem/tune.py --quick       # parameter study, smoke subset
 .venv/Scripts/python fem/tune.py               # full study -> fem/tune.npz (~30 min)
 .venv/Scripts/python figures/fig_fem_tune.py
+
+.venv/Scripts/python figures/fig_tuned_claims.py       # ~6 min, solves directly
+.venv/Scripts/python figures/fig_tuned_profiles.py     # ~4 min, solves directly
 ```
 
-## Source amplitude
+## Verified against the papers
+
+- 8x8 welded shield -> field reduced ~6x (Sergeant: "up to six times").
+  **Mesh-dependent — see "Which reproduced claims survive the mesh" below.**
+- High contact resistance (Rc>=10 mOhm) caps shielding near SF~1.1 (never > 2x).
+- Contact resistance monotonically degrades shielding (SF 4.0 -> 1.1).
+- Parallel config slightly better than transversal at intermediate Rc.
+- n_b=1 meshes converge to a wrong (too-high) value; n_b>=3 converge correctly;
+  transversal needs larger n_l — all as in Sergeant Fig. 3.
 
 **Amplitude note — resolved.** The unshielded field here is B0(0,0,1) = 12.37 uT
 against the papers' ≈14 uT. That ~12% gap is *not* an error in this code: an
@@ -103,8 +121,8 @@ plotting or digitization difference in the papers.
 
 ## FEM cross-validation
 
-The circuit method on its own can only be checked against itself and against
-curves read off the papers. `fem/` adds an independent check: a FEMM 4.2 harmonic 2-D
+Everything above is the circuit method checked against itself and against curves
+read off the papers. `fem/` adds an independent check: a FEMM 4.2 harmonic 2-D
 model in which we declare only geometry, materials and circuit constraints —
 FEMM owns the physics, so it can actually falsify this implementation.
 
@@ -112,6 +130,20 @@ FEMM owns the physics, so it can actually falsify this implementation.
 long, so the finite-length 3-D result — the circuit method's distinguishing
 feature — is *not* directly validated. What is validated is everything except the
 end effects, in the L → ∞ limit.
+
+**3-D axis (Elmer) — work in progress.** `fem/elmer3d.py` + `fem/compare3d.py`
+are the intended independent 3-D check of the finite 4 m × 4 m shield (the case
+this 2-D model structurally cannot reach). Built and validated so far: a
+MUMPS-enabled Elmer compiled from source under WSL (checked against Elmer's own
+`mgdyn_harmonic_wire` reference norm), the gmsh → ElmerGrid → ElmerSolver → sample
+pipeline driven from Windows through `wsl.exe`, and the plate modelled as a
+thin-sheet boundary condition. The open piece is the 3-phase source: the
+`fem/circuits_wip/` stranded-coil prototype drives the correct balanced current
+but its circuit-coupled H(curl) solve diverges with the available preconditioner;
+the fix is Hypre AMS (rebuild) or a monolithic direct circuit solve. See the
+`STATUS` block in `fem/elmer3d.py` and `fem/circuits_wip/README.md`. Until that
+lands, `compare3d.py` produces no valid number — it is scaffolding only. To run
+the WSL Elmer once available: set `ELMER_WSL_DISTRO=Ubuntu-24.04`.
 
 **T0 — source model.** With no shield, FEMM reproduces the analytic infinite-line
 field to 0.41% max / 0.25% RMS. This is what resolves the amplitude note above.
@@ -258,6 +290,38 @@ on a square mesh it is **identically 1/2**, at every refinement level. It is
 then not a discretization error that refining removes but a modelling error that
 refining preserves, and the T2/T3/T4 account above is right about it. Both
 statements are true in their own regime and neither generalises.
+
+## Which reproduced claims survive the mesh (`figures/fig_tuned_claims.py`)
+
+Applying the tuned cross-section to the papers' geometry does not give a better
+number; it shows that several of the numbers were never determined. `1 - f` can
+only be reduced by making the mesh strongly anisotropic, but a finite shield
+carries closed current loops whose return legs live on the along-shield
+filaments, so starving `n_along` to buy `f` destroys the loops. On the 4 × 4,
+driving `1 - f` from 0.41 to 0.01 takes SF from 4.0 *down* to 1.5.
+
+Sweeping the whole `(n_across, n_along)` family at `P2(0,0,1)`:
+
+| geometry | SF at the published mesh | SF across the family |
+|---|---|---|
+| 4 m × 4 m welded | 3.97 | 1.7 – 4.9 |
+| 8 m × 8 m welded | 6.05 | 3.2 – 13.9 |
+| `Rc` ≥ 1 mΩ | 1.09 – 1.34 | ±10% |
+
+So of the claims in the list above:
+
+- "8×8 welded → field reduced ~6×, matching Sergeant's *up to six times*" is
+  **not robust**. It holds at `n_across = 3` and nowhere else in the family;
+  refining the cross-section at Sergeant's `dy` gives ~14×.
+- "welded 4×4 gives a few-fold reduction" is robust as a statement about order
+  of magnitude, not as the number 3.97.
+- Every contact-resistance claim is robust. That regime is constraint-limited,
+  so the resistance model barely enters — the same welded/isolated asymmetry
+  `fem/tune.py` measures.
+
+`figures/fig_tuned_profiles.py` redraws Sergeant Fig. 5 and De Wulf Fig. 3 with
+the resulting band instead of a single curve: 18–27% wide at low `Rc`, 4% at
+high `Rc`. Closing it needs a directional fix to `_equiv_wire`, not tuning.
 
 ## Key modeling choices
 
