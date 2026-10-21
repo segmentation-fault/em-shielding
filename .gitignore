@@ -1,0 +1,13 @@
+# Scientific papers are never committed
+bib/
+*.pdf
+vssver.scc
+
+# Local environment / IDE
+.venv/
+.idea/
+.claude/
+
+# Python
+__pycache__/
+*.pyc

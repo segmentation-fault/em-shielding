@@ -1,0 +1,8 @@
+numpy>=1.26
+scipy>=1.11
+matplotlib>=3.8
+
+# FEM cross-validation (fem/). pyfemm is only a COM wrapper -- it also needs
+# FEMM 4.2 installed from https://www.femm.info/wiki/Download (Windows).
+pyfemm>=0.1.3
+pywin32; sys_platform == "win32"
