@@ -1,5 +1,7 @@
 # Fast (non-FEM) magnetic shielding of buried HV cables
 
+![|B| in the cable cross-section: 2-D FEM (left) vs the circuit method sliced at mid-length of a 64 m shield (right)](figures/fig_readme_hero.png)
+
 A compact Python implementation of the **wire-filament circuit method** for
 computing the magnetic shielding effectiveness of conductive plates placed over
 buried three-phase HV cables — a fast, mesh-free alternative to FEM.
@@ -73,6 +75,7 @@ tests/            inductance unit tests, sanity + claim verification
 | `figures/fig_fem_tune.py` | parameter tuning — the reference's noise floor, and the cross-section optimum |
 | `figures/fig_tuned_claims.py` | the reproduced claims across the mesh family — which survive |
 | `figures/fig_tuned_profiles.py` | Sergeant Fig. 5 and De Wulf Fig. 3 with their mesh-uncertainty bands |
+| `figures/fig_readme_hero.py` | README image — \|B\| cross-section, FEMM 2-D vs 64 m circuit slice (cached in `fem/hero.npz`) |
 
 ## Run
 
